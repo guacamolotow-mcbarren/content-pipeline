@@ -1,36 +1,57 @@
 ---
 name: content-pipeline
 description: >-
-  Мультиагентный конвейер создания контента «Инфосистемы Джет» на русском языке.
-  Категории: интервью, статьи для СМИ, технические статьи, пресс-релизы, кейсы,
-  исследования. Запуск: /start. Согласование: /approve, /reject. Используй при
-  написании статей, интервью, пресс-релизов, кейсов и исследований для Jet.
+  Конвейер контента «Инфосистемы Джет» (RU). Команды: /start, /fast, /approve,
+  /reject, /status, /export. Субагенты через Task. Статьи, интервью, кейсы.
 ---
 
 # Content Pipeline — «Инфосистемы Джет»
 
-Мультиагентный конвейер: бриф → план → драфт → ревью → согласование → дообучение.
+**Язык:** русский. **Путь skill:** `.cursor/skills/content-pipeline/`
 
-**Язык всех материалов: русский.**
+## Команды
 
-**Базовый путь:** `.cursor/skills/content-pipeline/` (skill, style guides, шаблоны, референсы).
+| Команда | Действие |
+|---------|----------|
+| `/start` | Полный пайплайн (9 этапов) |
+| `/fast` | Ускоренный: brief → plan → draft → 1 ревью → final |
+| `/approve` | Одобрить материал / правки style guide |
+| `/reject [текст]` | Отклонить — **только точечные** правки по списку |
+| `/status` | Этап и файлы (читай `state.md`) |
+| `/export [draft\|final]` | Экспорт в `.docx` → `content-project/export/` |
 
-## Быстрый старт
+## Режимы
+
+### `/start` — полный
 
 ```
-/start                    — начать новый материал
-/approve                  — одобрить материал / изменения style guide
-/reject [комментарий]     — отклонить с правками
-/status                   — текущий этап и файлы
+START → BRIEF → INTERVIEW → PLAN → PLAN_REVIEW → DRAFT → EDIT_LOOP → LEAD_REVIEW → USER_REVIEW → FINETUNE → DONE
 ```
+
+**HITL:** brief, final, finetune. После каждого `/reject` — показ обновлённого материала.
+
+### `/fast` — срочный
+
+```
+START → BRIEF → PLAN → DRAFT → EDIT_LOOP (max 1) → LEAD_REVIEW → USER_REVIEW → DONE
+```
+
+**Пропуск:** интервью (2), ревью плана (4), finetune (9), цикл редактора >1.
+
+**HITL:** brief, final.
+
+**Когда предлагать:** дедлайн <2 ч, источники в `inputs/`, бриф почти полный.
+
+При старте создай `state.md` (`mode: full` или `mode: fast`) по [шаблону](templates/state.md). Обновляй `stage` и счётчики раундов при каждом переходе.
 
 ## Структура проекта
 
-Создай в рабочей директории:
-
 ```
 content-project/
-├── inputs/          # исходники пользователя
+├── inputs/
+├── inputs/extracted/
+├── export/              # .docx из /export
+├── state.md             # этап, режим, раунды
 ├── brief.md
 ├── plan.md
 ├── draft.md
@@ -38,213 +59,113 @@ content-project/
 └── final.md
 ```
 
-## Субагенты
+## Оркестрация — только Task
 
-| Агент | Файл | Когда вызывать | Модель |
-|-------|------|----------------|--------|
-| Тимлид | `content-teamlead` | /start, ревью, финал, дообучение | Composer (этапы 1, 4, 8, 9); **GPT-5.5+** (этап 7) |
-| Интервьюер | `content-interviewer` | после brief.md | Composer |
-| Копирайтер | `content-copywriter` | plan.md, draft.md, правки | Composer (этап 3); **GPT-5.5+** (этапы 5, 6) |
-| Редактор | `content-editor` | ревью draft.md | **GPT-5.5+** (этап 6) |
+Оркестратор **не пишет** plan/draft и **не ревьюит** сам. На каждую роль — **Task tool** с `subagent_type` из таблицы:
 
-Вызывай через Task tool или явно: «используй субагента content-copywriter».
+| Роль | subagent_type | Когда |
+|------|---------------|-------|
+| Тимлид | `content-teamlead` | /start, /fast, ревью плана, финал, finetune, /export |
+| Интервьюер | `content-interviewer` | после brief (**только `/start`**) |
+| Копирайтер | `content-copywriter` | plan, draft, правки |
+| Редактор | `content-editor` | ревью draft |
 
-## Категории и style guides
+Промпт Task: режим (`state.md`), текущий этап, пути к файлам, что сделать. После Task — обнови `state.md`.
 
-| Категория | Ключ | Style guide | Эталон |
-|-----------|------|-------------|--------|
-| Интервью | `interview` | [interview.md](style-guides/interview.md) | Интервью Янкина (см. references/) |
-| Статья для СМИ | `article` | [article.md](style-guides/article.md) | ИИ-агенты для управленца |
-| Техническая статья | `article-tech` | [article-tech.md](style-guides/article-tech.md) | jetinfosystems на Habr |
-| Пресс-релиз | `press-release` | [press-release.md](style-guides/press-release.md) | cnews.ru/news/line/… |
-| Технический кейс | `case` | [case.md](style-guides/case.md) | habr case/*.docx |
-| Исследование | `research` | [research.md](style-guides/research.md) | resaerch etalon/*.docx |
+**Модели:** этапы 1–4, 8–9 — Composer; **5, 6, 7** — GPT-5.5+ (напомни пользователю перед драфтом).
 
-## State Machine
+## Категории
 
-```
-START → BRIEF → INTERVIEW → PLAN → PLAN_REVIEW → DRAFT → EDIT_LOOP → LEAD_REVIEW → USER_REVIEW → FINETUNE → DONE
-```
-
-Отслеживай этап. При `/status` показывай текущий и следующий шаг.
-
-## Рекомендуемые модели Cursor
-
-| Этапы | Модель | Почему |
-|-------|--------|--------|
-| 1–4, 8–9 | **Composer** | Сбор требований, уточнения, план, ревью плана, согласование, дообучение |
-| **5, 6, 7** | **Мощная модель** (минимум **GPT-5.5** / ChatGPT 5.5) | Написание драфта, редактура, финальное ревью — нужны качество текста и глубина |
-
-Перед этапами 5–7 переключи модель в Cursor вручную или укажи в промпте: «используй GPT-5.5».
+| Ключ | Style guide |
+|------|-------------|
+| `interview` | [interview.md](style-guides/interview.md) |
+| `article` | [article.md](style-guides/article.md) |
+| `article-tech` | [article-tech.md](style-guides/article-tech.md) |
+| `press-release` | [press-release.md](style-guides/press-release.md) |
+| `case` | [case.md](style-guides/case.md) |
+| `research` | [research.md](style-guides/research.md) |
 
 ---
 
-## Этап 1: Старт (/start)
+## Этапы (полный `/start`)
 
-**Агент:** content-teamlead
+| # | Этап | Агент | HITL |
+|---|------|-------|------|
+| 1 | Бриф | teamlead | да |
+| 2 | Уточнения | interviewer | нет |
+| 3 | План | copywriter | нет |
+| 4 | Ревью плана | teamlead | нет (max 2 раунда) |
+| 5 | Драфт | copywriter | нет |
+| 6 | Редактура | editor → copywriter | нет (max 3 раунда) |
+| 7 | Финал | teamlead → `final.md` | да |
+| 8 | Согласование | пользователь | `/approve` / `/reject` |
+| 9 | Finetune | teamlead → style guide | да |
 
-1. Поприветствуй, спроси категорию (если не указана)
-2. Проведи Q&A: тема, спикер, аудитория, источники, ограничения
-3. Прочитай файлы из `inputs/` (.md напрямую; .docx/.pdf/.pptx — извлеки текст)
-4. Создай `brief.md` по [шаблону](templates/brief.md)
+## Этапы (`/fast`)
 
-**HITL:** покажи бриф → жди подтверждения → `BRIEF`
-
----
-
-## Этап 2: Уточнения
-
-**Агент:** content-interviewer
-
-1. Изучи brief + источники
-2. Задай 3–7 уточняющих вопросов (или «бриф полный»)
-3. Обнови brief.md ответами
-
-→ `INTERVIEW` → `PLAN`
-
----
-
-## Этап 3: План
-
-**Агент:** content-copywriter
-
-1. Прочитай brief + style guide категории + эталоны
-2. Создай `plan.md` по [шаблону](templates/plan.md)
-
-→ `PLAN_REVIEW`
+| # | Этап | Агент | Примечание |
+|---|------|-------|------------|
+| 1 | Бриф | teamlead | HITL |
+| 2 | План (краткий) | copywriter | без отдельного ревью тимлида |
+| 3 | Драфт | copywriter | GPT-5.5+ |
+| 4 | 1 ревью | editor → copywriter | **max 1 раунд** |
+| 5 | Финал | teamlead → `final.md` | HITL |
+| 6 | Согласование | пользователь | `/approve` / `/reject` |
 
 ---
 
-## Этап 4: Ревью плана
+## `/reject` — точечные правки
 
-**Агент:** content-teamlead
+1. Запиши комментарий пользователя в `feedback.md` **дословно**
+2. Task → **copywriter**: правит **только** указанные абзацы/разделы
+3. **Запрещено:** переписывать весь `draft.md` / `final.md` с нуля
+4. Если правок >5 блоков — один проход **по разделам**, сохраняя остальной текст
+5. Обнови версию в шапке драфта (`draft-vN`), инкремент `round_user_reject` в `state.md`
+6. Max **2 раунда** `/reject` (full и fast)
 
-- Критичные правки → `feedback.md` → копирайтер → повтор (max 2 раунда)
-- OK → `DRAFT`
+## `/export` — docx
 
----
+1. Источник: `draft.md` (по умолчанию) или `final.md` (`/export final`)
+2. Убери служебные блоки: шапку версии, «Заметки для редактора», «Метаданные» (если не для публикации)
+3. Создай `content-project/export/` при необходимости
+4. Конвертация:
+   ```bash
+   pandoc content-project/final.md -o content-project/export/final.docx
+   ```
+5. Если pandoc недоступен — сообщи пользователю; fallback: установить pandoc или экспорт вручную
 
-## Этап 5: Драфт
-
-**Агент:** content-copywriter  
-**Модель:** мощная (минимум GPT-5.5 / ChatGPT 5.5)
-
-1. Напиши полный текст в `draft.md` по [шаблону](templates/draft.md)
-2. Строго по plan + style guide
-
-→ `EDIT_LOOP`
-
----
-
-## Этап 6: Редактура (цикл)
-
-**Агент:** content-editor → content-copywriter  
-**Модель:** мощная (минимум GPT-5.5 / ChatGPT 5.5)
-
-```
-редактор → feedback.md → копирайтер → draft-vN → редактор
-```
-
-- Max **3 раунда** редактор ↔ копирайтер
-- Редактор одобрил → `LEAD_REVIEW`
-- 3 раунда без согласия → эскалация тимлиду
-
----
-
-## Этап 7: Финальное ревью тимлида
-
-**Агент:** content-teamlead  
-**Модель:** мощная (минимум GPT-5.5 / ChatGPT 5.5)
-
-- Критичные правки → feedback → копирайтер + редактор
-- OK → `final.md` → `USER_REVIEW`
-
-**HITL:** покажи final.md пользователю.
-
----
-
-## Этап 8: Согласование пользователя
-
-| Команда | Действие |
-|---------|----------|
-| `/approve` | → `FINETUNE` |
-| `/reject [текст]` | feedback.md (дословно) → копирайтер. Max **2 раунда** |
-
----
-
-## Этап 9: Дообучение фреймворка
-
-**Агент:** content-teamlead
-
-1. Сравни final.md с style guide
-2. Предложи правки в `.cursor/skills/content-pipeline/style-guides/[category].md`
-3. Покажи diff
-
-**HITL:** `/approve` → применить. `/reject` → пропустить.
-
-→ `DONE`
-
----
-
-## Чеклист прогресса
-
-Копируй и обновляй:
-
-```
-- [ ] Этап 1: brief.md создан и согласован
-- [ ] Этап 2: уточнения собраны
-- [ ] Этап 3: plan.md написан
-- [ ] Этап 4: план одобрен тимлидом
-- [ ] Этап 5: draft.md написан
-- [ ] Этап 6: редактор одобрил (раунд N/3)
-- [ ] Этап 7: тимлид одобрил → final.md
-- [ ] Этап 8: пользователь одобрил
-- [ ] Этап 9: style guide обновлён
-```
-
-## Работа с файлами
-
-### Чтение источников
+## Источники
 
 | Формат | Метод |
 |--------|-------|
 | .md | Read |
-| .docx | PowerShell + Zip + word/document.xml или pandoc |
-| .pdf | pdfplumber / Read если текстовый |
-| .pptx | python-pptx или извлечение текста |
+| .docx | PowerShell + Zip / pandoc → `inputs/extracted/` |
+| .pdf | pdfplumber / Read |
+| .pptx | python-pptx / извлечение текста |
 
-Сохраняй извлечённый текст в `inputs/extracted/`.
+Эталоны кейсов/исследований: `habr case/*.docx`, `resaerch etalon/*.docx`.
 
-### Локальные эталоны (в корне workspace)
+## Критичная vs некритичная правка
 
-- Кейсы: `habr case/*.docx`
-- Исследования: `resaerch etalon/*.docx`
+**Критичная** (блокирует публикацию): факт, NDA, несоответствие брифу, формат категории.
 
-При написании кейсов/исследований — прочитай соответствующий эталон.
+**Некритичная:** стиль, формулировки, порядок разделов.
 
-## Критерии «критичной правки»
+## Правила
 
-Блокирует публикацию:
-- Фактическая ошибка или неподтверждённое утверждение
-- Нарушение NDA (реальные IP, имена, домены)
-- Несоответствие брифу (другая тема, пропущен ключевой месседж)
-- Грубое нарушение style guide (формат категории)
+1. Читай `state.md` в начале хода и после каждого Task
+2. HITL — по таблице режима; не перескакивай этапы
+3. Факты только из brief и источников
+4. Версионируй драфты (`draft-v2`…)
+5. Шаблоны: [brief](templates/brief.md), [plan](templates/plan.md), [draft](templates/draft.md), [feedback](templates/feedback.md), [state](templates/state.md)
 
-Не блокирует:
-- Стилистика, формулировки, длина абзацев
-- Порядок некритичных разделов
+## Чеклист (краткий)
 
-## Общие правила
-
-1. **Один этап за раз** — не перескакивай без завершения текущего
-2. **HITL** — пауза на этапах 1, 8, 9
-3. **Файлы** — каждый артефакт в .md, версионируй драфты (draft-v2…)
-4. **Не выдумывай** — факты только из brief и источников
-5. **Язык** — русский, термины по style guide
-
-## Шаблоны
-
-- [brief.md](templates/brief.md)
-- [plan.md](templates/plan.md)
-- [draft.md](templates/draft.md)
-- [feedback.md](templates/feedback.md)
+```
+- [ ] state.md актуален
+- [ ] brief согласован
+- [ ] plan / draft / final на месте
+- [ ] редактор одобрил (раунд N)
+- [ ] пользователь /approve
+- [ ] finetune (только /start)
+```

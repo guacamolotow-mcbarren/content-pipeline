@@ -49,6 +49,8 @@ git clone https://github.com/guacamolotow-mcbarren/content-pipeline.git
 ```text
 content-project/
 ├── inputs/          # исходники: .md, .docx, .pdf, .pptx
+├── export/          # .docx из /export
+├── state.md         # этап, режим, раунды
 ├── brief.md
 ├── plan.md
 ├── draft.md
@@ -66,36 +68,48 @@ content-project/
 Тема: [ваша тема]
 ```
 
-Или явно попросите субагента:
+**Срочный дедлайн** (<2 ч, источники готовы):
 
 ```text
-Используй content-teamlead для сбора брифа на интервью про [тема]
+@content-pipeline /fast
 ```
+
+Оркестратор делегирует роли **субагентам через Task** — не пишет текст сам.
 
 ### Команды пайплайна
 
 | Команда | Действие |
 |---------|----------|
-| `/start` | Начать новый материал, собрать бриф |
+| `/start` | Полный пайплайн (9 этапов) |
+| `/fast` | Ускоренный: brief → plan → draft → 1 ревью → final |
 | `/approve` | Одобрить материал или правки style guide |
-| `/reject [комментарий]` | Отклонить с правками |
-| `/status` | Текущий этап и файлы |
+| `/reject [комментарий]` | Точечные правки (не перепись всего текста) |
+| `/status` | Этап и файлы (`state.md`) |
+| `/export [draft\|final]` | Экспорт в `.docx` → `export/` |
 
 ---
 
-## Этапы пайплайна
+## Режимы
+
+### `/start` — полный
 
 ```text
 START → BRIEF → INTERVIEW → PLAN → PLAN_REVIEW → DRAFT → EDIT_LOOP → LEAD_REVIEW → USER_REVIEW → FINETUNE → DONE
 ```
 
-1. **Тимлид** собирает бриф через Q&A
-2. **Интервьюер** задаёт уточняющие вопросы
-3. **Копирайтер** пишет план и драфт
-4. **Редактор** ревьюит (до 3 раундов)
-5. **Тимлид** финальное ревью → `final.md`
-6. **Пользователь** согласует (`/approve` / `/reject`)
-7. **Тимлид** предлагает дообучение style guide
+HITL: brief, final, finetune.
+
+### `/fast` — срочный
+
+```text
+START → BRIEF → PLAN → DRAFT → EDIT (×1) → LEAD_REVIEW → USER_REVIEW → DONE
+```
+
+Без интервью, ревью плана, finetune. HITL: brief, final.
+
+### `/reject`
+
+Копирайтер правит **только указанные** абзацы/разделы — не переписывает весь `draft.md`.
 
 ---
 
@@ -132,7 +146,7 @@ content-pipeline/
     ├── skills/content-pipeline/
     │   ├── SKILL.md
     │   ├── style-guides/      # interview, article, article-tech, …
-    │   ├── templates/         # brief, plan, draft, feedback
+    │   ├── templates/         # brief, plan, draft, feedback, state
     │   └── references/        # эталонные фрагменты
     └── agents/
         ├── content-teamlead.md
