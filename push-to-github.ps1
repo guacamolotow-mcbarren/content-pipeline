@@ -1,5 +1,5 @@
 # Push content-pipeline to GitHub
-# Usage: $env:GITHUB_TOKEN = "ghp_..." ; .\push-to-github.ps1
+# Usage: $env:GITHUB_TOKEN = "github_pat_..." ; .\push-to-github.ps1
 
 param(
     [string]$Token = $env:GITHUB_TOKEN
@@ -13,9 +13,8 @@ $repo = "https://github.com/guacamolotow-mcbarren/content-pipeline.git"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if (-not $Token) {
-    Write-Host "Нужен GitHub token с правом write на репозиторий."
-    Write-Host 'Создайте: GitHub → Settings → Developer settings → Personal access tokens'
-    Write-Host 'Затем: $env:GITHUB_TOKEN = "ghp_..." ; .\push-to-github.ps1'
+    Write-Host "Need GITHUB_TOKEN with repo write access."
+    Write-Host 'Set: $env:GITHUB_TOKEN = "github_pat_..." ; .\push-to-github.ps1'
     exit 1
 }
 
