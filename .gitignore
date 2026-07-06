@@ -1,0 +1,26 @@
+# Рабочие материалы пользователя (не публиковать)
+content-project/
+**/inputs/
+**/inputs/extracted/
+brief.md
+plan.md
+draft*.md
+feedback.md
+final.md
+
+# Локальные эталоны
+habr case/
+resaerch etalon/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Секреты
+.env
+*.token
+*token*
