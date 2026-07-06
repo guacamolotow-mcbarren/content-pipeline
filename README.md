@@ -4,7 +4,7 @@
 
 Работает в [Cursor](https://cursor.com): четыре субагента (тимлид, интервьюер, копирайтер, редактор) ведут материал от идеи до финального текста.
 
-**Репозиторий:** [github.com/jet-marketing-pr-ai-utilities/content-pipeline](https://github.com/jet-marketing-pr-ai-utilities/content-pipeline)
+**Репозиторий:** [github.com/guacamolotow-mcbarren/content-pipeline](https://github.com/guacamolotow-mcbarren/content-pipeline)
 
 ---
 
@@ -30,7 +30,7 @@
 Склонируйте репозиторий или скачайте ZIP и скопируйте папку `.cursor/` в корень вашего workspace в Cursor:
 
 ```bash
-git clone https://github.com/jet-marketing-pr-ai-utilities/content-pipeline.git
+git clone https://github.com/guacamolotow-mcbarren/content-pipeline.git
 ```
 
 ```text
